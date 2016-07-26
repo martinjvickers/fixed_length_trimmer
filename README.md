@@ -8,9 +8,9 @@ Yes it has but not quite. First, this is not a quality trimmer. It doesn't accou
 Yup. I didn't want a script though, I wanted something more robust. SeqAn is awesome when working with fastq's (and fastq.gz) out of the box.
 
 ##Limitations
-*Currently, it simply takes N bases starting from the left. 
-*No matter what is in the third line of a read, it always simply displays a `+`
-*It prints to stdout only at the moment.
+*  Currently, it simply takes N bases starting from the left. 
+*  No matter what is in the third line of a read, it always simply displays a `+`
+*  It prints to stdout only at the moment.
 
 ##Building from source (assuming you have cloned this library and the seqan library in the same directory)
     cd fixed_length_trimmer
