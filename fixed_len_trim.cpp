@@ -9,22 +9,22 @@ struct ModifyStringOptions
 
 seqan::ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & options, int argc, char const ** argv)
 {
-	seqan::ArgumentParser parser("Fixed Length Trimmer");
-	addOption(parser, seqan::ArgParseOption("i", "input-file", "Path to the input file", seqan::ArgParseArgument::INPUT_FILE, "IN"));
+	seqan::ArgumentParser parser("fixed_len_trim");
+	addOption(parser, seqan::ArgParseOption("i", "input-file", "Path to the input file. Supported input: fq, fq.gz, fastq, fastq.gz, fasta, fasta.gz, fa and fa.gz.", seqan::ArgParseArgument::INPUT_FILE, "IN"));
 	setRequired(parser, "input-file");
 	setShortDescription(parser, "Methylation Tools");
 	setVersion(parser, "0.0.1");
 	setDate(parser, "July 2016");
-	addUsageLine(parser, "-i sequence.fastq [\\fIOPTIONS\\fP] ");
+	addUsageLine(parser, "-i [input file] -o [output file] -l [trim length]");
 	addOption(parser, seqan::ArgParseOption("l", "length", "Length to trim to.",seqan::ArgParseArgument::INTEGER, "INT"));
-	setDefaultValue(parser, "length", "21");
-	addOption(parser, seqan::ArgParseOption("o", "output-file", "Path to the output file", seqan::ArgParseArgument::OUTPUT_FILE, "IN"));
+	setRequired(parser, "l");
+	addOption(parser, seqan::ArgParseOption("o", "output-file", "Path to the output file. You must include a file extension. Supported output types: fq, fastq, fasta and fa.", seqan::ArgParseArgument::OUTPUT_FILE, "OUT"));
+	setRequired(parser, "o");
 
-	addDescription(parser, "A tool to quickly deal with Bismark downstream analysis in a version controlled stable way");
+	addDescription(parser, "Trims your fasta files to a fixed length.");
 	seqan::ArgumentParser::ParseResult res = seqan::parse(parser, argc, argv);
 
-	// If parsing was not successful then exit with code 1 if there were errors.
-	// Otherwise, exit with code 0 (e.g. help was printed).
+	// Extract options ONLY if the args are parsed correctly
 	if (res != seqan::ArgumentParser::PARSE_OK)
 		return res;
 
@@ -36,18 +36,18 @@ seqan::ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & option
 
 }
 
-/*
-Aim: calculate introns.
-
-Current progress: It compiles!
-
-*/
 int main(int argc, char const ** argv)
 {
 	//parse our options
 	ModifyStringOptions options;
 	seqan::ArgumentParser::ParseResult res = parseCommandLine(options, argc, argv);
-	
+
+	// If parsing was not successful then exit with code 1 if there were errors.
+	// Otherwise, exit with code 0 (e.g. help was printed).
+	if (res != seqan::ArgumentParser::PARSE_OK)
+		return res == seqan::ArgumentParser::PARSE_ERROR;	
+
+
 	SeqFileIn seqFileIn;
 	if (!open(seqFileIn, toCString(options.inputFileName)))
 	{
@@ -55,37 +55,42 @@ int main(int argc, char const ** argv)
 		return 1;
 	}
 
+	CharString id;
+	Dna5String seq;
+	CharString qual;
 
-	StringSet<CharString> ids;
-	StringSet<Dna5String> seqs;
-	StringSet<CharString> quals;
+	SeqFileOut seqFileOut;
+        if (!open(seqFileOut, toCString(options.outputFileName)))
+        {
+                std::cerr << "ERROR: Could not open the file.\n";
+                return 1;
+        }
 
-	try
+	while(!atEnd(seqFileIn))
 	{
-		readRecords(ids, seqs, quals, seqFileIn);
-	}
-	catch (Exception const & e)
-	{
-		std::cout << "ERROR: " << e.what() << std::endl;
-		return 1;
-	}	
+        	try
+        	{
+        	        readRecord(id, seq, qual, seqFileIn);
+        	}
+        	catch (Exception const & e)
+        	{
+        	        std::cout << "ERROR: " << e.what() << std::endl;
+        	        return 1;
+        	}
 
-	for (unsigned i = 0; i < length(ids); ++i)
-		if(length(seqs[i]) >= options.length)
-		{
-			String<Dna> dnaSeq;
-			resize(dnaSeq, options.length, Exact());
-			assign(dnaSeq, seqs[i], Limit());
+               	if(length(seq) >= options.length)
+               	{
+                       	String<Dna> dnaSeq;
+               	        resize(dnaSeq, options.length, Exact());
+               	        assign(dnaSeq, seq, Limit());
 
-			CharString dnaQual;
-			resize(dnaQual, options.length, Exact());
-			assign(dnaQual, quals[i], Limit());
-			
-			std::cout << "@" << ids[i] << "\n";
-			std::cout << dnaSeq << "\n";
-			std::cout << "+" << "\n";
-			std::cout << dnaQual << "\n";
+               	        CharString dnaQual;
+               	        resize(dnaQual, options.length, Exact());
+               	        assign(dnaQual, qual, Limit());
+
+			writeRecord(seqFileOut, id, dnaSeq, dnaQual);			
 		}
-
+	}
+	
 	return 0;
 }
